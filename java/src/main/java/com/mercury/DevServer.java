@@ -68,7 +68,16 @@ public class DevServer {
 
         server.createContext("/api/", new ApiHandler());
         server.createContext("/", new StaticHandler());
-        server.setExecutor(null);
+        // Multi-threaded so a slow request — e.g. a dead-host connection test that
+        // waits out its 2s timeout — can't block the schema / query / other tests.
+        // kdb+ c objects aren't thread-safe, so per-connection IPC is serialized in
+        // QueryExecutor; connection tests use throwaway sockets and run freely.
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(16, r -> {
+            Thread t = new Thread(r, "mercury-http");
+            t.setDaemon(true);
+            return t;
+        });
+        server.setExecutor(pool);
         server.start();
 
         String url = "http://127.0.0.1:" + bound;
@@ -80,7 +89,7 @@ public class DevServer {
 
         openBrowser(url);
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> server.stop(0)));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> { server.stop(0); pool.shutdownNow(); }));
     }
 
     /**

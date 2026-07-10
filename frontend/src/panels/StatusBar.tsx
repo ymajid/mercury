@@ -4,7 +4,9 @@ export function StatusBar() {
   const conn = activeConnection.value;
   const timing = lastTiming.value;
   const liveStatus = activeConnectionId.value ? connectionStatuses.value[activeConnectionId.value] : null;
-  const dot = liveStatus === 'connected' ? '🟢' : '🔴';
+  const dot = liveStatus === 'connected' ? '🟢'
+    : (liveStatus === 'error' || liveStatus === 'disconnected') ? '🔴'
+    : '⚪';
 
   return (
     <div style={{

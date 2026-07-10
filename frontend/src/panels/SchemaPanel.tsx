@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
-import { activeConnectionId } from '../store';
+import { activeConnectionId, workspaceNeedsRefresh } from '../store';
 import * as bridge from '../bridge';
 
 interface SchemaCol { name: string; type: string }
@@ -50,12 +50,11 @@ export function SchemaPanel() {
 
   useEffect(() => { refresh(); }, [activeConnectionId.value]);
 
-  // Also listen for refresh after queries
-  useEffect(() => {
-    const h = () => refresh();
-    window.addEventListener('mercury:execute', h);
-    return () => window.removeEventListener('mercury:execute', h);
-  }, []);
+  // Refresh after any query completes — the workspace signal is bumped then,
+  // whether the query ran via the Run button or Ctrl+Enter — so newly created
+  // tables show up without hitting Refresh manually.
+  const wsRefreshTick = workspaceNeedsRefresh.value;
+  useEffect(() => { if (wsRefreshTick > 0) refresh(); }, [wsRefreshTick]);
 
   const toggle = (key: string) => {
     const next = new Set(expanded);

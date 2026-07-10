@@ -51,7 +51,10 @@ public class QueryExecutor {
      * @return JSON string with shape:
      *         { "type": "table"|"dict"|"list"|"atom"|"error", ... }
      */
-    public String executeQuery(String connId, String queryText) {
+    // synchronized: kdb+ c objects aren't thread-safe, so only one query/workspace
+    // call touches a (persistent) connection at a time. cancelQuery is deliberately
+    // NOT synchronized so it can abort a running query by closing the socket.
+    public synchronized String executeQuery(String connId, String queryText) {
         Object c;
         try {
             c = connectionManager.getConnection(connId);
@@ -170,7 +173,7 @@ public class QueryExecutor {
      * Query the connected kdb+ process for workspace context (tables, columns,
      * functions, variables) to power autocomplete.
      */
-    public String getWorkspaceContext(String connId) {
+    public synchronized String getWorkspaceContext(String connId) {
         Object c;
         try {
             c = connectionManager.getConnection(connId);

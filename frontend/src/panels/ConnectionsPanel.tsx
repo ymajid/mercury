@@ -186,9 +186,14 @@ export function ConnectionsPanel() {
   const renderConn = (c: bridge.Connection, depth: number) => {
     const isActive = activeConnectionId.value === c.id;
     const liveStatus = connectionStatuses.value[c.id];
-    let dot: string, dotColor: string;
-    if (liveStatus === 'connected') { dot = '●'; dotColor = 'var(--status-ok)'; }
-    else { dot = '●'; dotColor = 'var(--status-error)'; }
+    // green = connected · red = error/unreachable · grey = not yet probed / checking
+    const dot = '●';
+    const dotColor = liveStatus === 'connected' ? 'var(--status-ok)'
+      : (liveStatus === 'error' || liveStatus === 'disconnected') ? 'var(--status-error)'
+      : 'var(--text-dim)';
+    const statusLabel = liveStatus === 'connected' ? 'Connected'
+      : (liveStatus === 'error' || liveStatus === 'disconnected') ? 'Unreachable'
+      : 'Checking…';
 
     return (
       <div key={c.id} onClick={() => handleSelect(c.id)}
@@ -200,8 +205,8 @@ export function ConnectionsPanel() {
           paddingLeft: (12 + depth * 14) + 'px',
         }}>
         <div>
-          <div style={{ color: dotColor, fontWeight: isActive ? 'bold' : 'normal' }}>
-            <span style={{ marginRight: '4px' }}>{dot}</span>
+          <div style={{ color: 'var(--text-bright)', fontWeight: isActive ? 'bold' : 'normal' }}>
+            <span title={statusLabel} style={{ color: dotColor, marginRight: '4px' }}>{dot}</span>
             {c.name}
           </div>
           <div style={{ color: 'var(--text-dim)', fontSize: '11px', marginTop: '1px' }}>
