@@ -89,7 +89,11 @@ public class ConnectionManager {
         if (mc == null) {
             throw new IllegalArgumentException("Unknown connection: " + id);
         }
-        if (mc.c == null || !isConnected(mc)) {
+        // Reconnect only if we have no socket. We deliberately DON'T ping-per-query
+        // (k "1"): that extra read is a desync vector, and a dead socket is instead
+        // detected by the query failing, after which executeQuery drops it so the
+        // next call reconnects — see QueryExecutor.
+        if (mc.c == null) {
             mc.c = connect(mc);
         }
         return mc.c;
@@ -176,9 +180,17 @@ public class ConnectionManager {
             String up = (username != null && !username.isEmpty())
                     ? username + ":" + (password != null ? password : "")
                     : "";
-            return cClass.getConstructor(String.class, int.class, String.class,
+            Object conn = cClass.getConstructor(String.class, int.class, String.class,
                         boolean.class, int.class)
                     .newInstance(host, port, up, useTls, CONNECT_TIMEOUT_MS);
+            // c.java sets the socket's read timeout to the connect timeout. Clear it
+            // (0 = infinite) so long-running queries don't throw "Read timed out" —
+            // which would also leave the socket desynced and return stale results.
+            try {
+                Object sock = cClass.getField("s").get(conn);
+                if (sock instanceof java.net.Socket) ((java.net.Socket) sock).setSoTimeout(0);
+            } catch (Exception ignored) { /* best effort — field/socket may differ */ }
+            return conn;
         } catch (ClassNotFoundException e) {
             throw new IOException(
                     "com.kx.c not found on classpath. " +
@@ -189,17 +201,4 @@ public class ConnectionManager {
         }
     }
 
-    private static boolean isConnected(ManagedConnection mc) {
-        if (mc.c == null) return false;
-        try {
-            // Send a simple ping to verify the connection is alive
-            mc.c.getClass().getMethod("k", String.class).invoke(mc.c, "1");
-            return true;
-        } catch (Exception e) {
-            // Connection is dead — close and clear it
-            try { mc.c.getClass().getMethod("close").invoke(mc.c); } catch (Exception ignored) {}
-            mc.c = null;
-            return false;
-        }
-    }
 }

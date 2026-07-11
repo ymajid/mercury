@@ -262,6 +262,9 @@ export const resultPanelTab = signal<'result' | 'console' | 'history' | 'chart'>
 // `sidebar` = sidebar pane width; `editor` = editor pane height (of the vertical split).
 export const layoutSizes = signal<{ sidebar: number; editor: number }>({ sidebar: 18, editor: 55 });
 
+// Editor cursor position + current-line length, shown in the status bar.
+export const cursorInfo = signal<{ line: number; col: number; lineChars: number } | null>(null);
+
 
 // ---- File Browser ----
 export const currentDir = signal<string>('');

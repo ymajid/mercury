@@ -92,6 +92,12 @@ public class QueryExecutor {
             serverMs = (System.nanoTime() - t0) / 1_000_000;
         } catch (Exception e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
+            // A kdb+ error (KException, e.g. 'type) is a normal result and leaves
+            // the stream intact. Any other failure (IO/socket/EOF) may have left
+            // the socket desynced, so drop it — the next query reconnects clean and
+            // won't return a stale/previous result.
+            boolean kdbError = "KException".equals(cause.getClass().getSimpleName());
+            if (!kdbError) connectionManager.disconnect(connId);
             String msg = cause.getMessage();
             if (msg == null || msg.isEmpty()) msg = cause.getClass().getSimpleName();
             // Check if we were cancelled (connection closed from cancelQuery)

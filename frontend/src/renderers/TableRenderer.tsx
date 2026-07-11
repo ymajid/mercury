@@ -273,7 +273,8 @@ export function TableRenderer({ result }: Props) {
                     <tr key={absIdx} style={{ height: ROW_HEIGHT, background: absIdx % 2 === 0 ? 'var(--bg)' : 'var(--bg-row-alt)' }}>
                       <td style={{ ...tdStyle, color: 'var(--border-strong)', textAlign: 'right', width: '28px', fontSize: '11px' }}>{absIdx}</td>
                       {row.map((val: unknown, ci: number) => {
-                        const col = (columns as Array<{isKey?: boolean}>)[ci];
+                        const col = (columns as Array<{type?: string; isKey?: boolean}>)[ci];
+                        const isSym = col?.type === 'symbol';
                         return (
                           <td key={ci} style={{
                             ...tdStyle,
@@ -281,12 +282,14 @@ export function TableRenderer({ result }: Props) {
                             borderRight: col?.isKey ? '2px solid var(--keycol-border)' : undefined,
                           }}
                             onClick={() => {
+                              // Copy symbols with their backtick so they paste straight back into q.
                               const text = typeof val === 'object' && val !== null
-                                ? formatKdbInline(val) : String(val ?? '::');
+                                ? formatKdbInline(val)
+                                : (isSym && typeof val === 'string' ? '`' + val : String(val ?? '::'));
                               if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
                             }}
                             title="Click to copy">
-                            <CellValue val={val} />
+                            <CellValue val={val} sym={isSym} />
                           </td>
                         );
                       })}
@@ -307,7 +310,7 @@ export function TableRenderer({ result }: Props) {
 
 // ---- Cell value renderer — shows REPL-style inline text, expandable for nested types ----
 
-function CellValue({ val }: { val: unknown }) {
+function CellValue({ val, sym }: { val: unknown; sym?: boolean }) {
   const [expanded, setExpanded] = useState(false);
 
   // --- primitives ---
@@ -322,7 +325,8 @@ function CellValue({ val }: { val: unknown }) {
     return <span style={{ color: 'var(--syntax-number)' }}>{text}</span>;
   }
   if (typeof val === 'string') {
-    return <span style={{ color: 'var(--syntax-string)' }}>{val}</span>;
+    // Symbol columns show a leading backtick (kdb style) so a copied cell pastes back into q.
+    return <span style={{ color: 'var(--syntax-string)' }}>{sym ? '`' + val : val}</span>;
   }
 
   if (typeof val !== 'object') {

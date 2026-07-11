@@ -510,9 +510,11 @@ public class DevServer {
 
     private static int num(Map<String, Object> m, String key, int def) {
         Object v = m.get(key);
-        if (v instanceof Integer) return (Integer) v;
+        // The JSON parser emits Long for integers, so accept any Number — not just
+        // Integer — otherwise a specified port silently fell back to the default.
+        if (v instanceof Number) return ((Number) v).intValue();
         if (v instanceof String) {
-            try { return Integer.parseInt((String) v); } catch (NumberFormatException e) { return def; }
+            try { return Integer.parseInt(((String) v).trim()); } catch (NumberFormatException e) { return def; }
         }
         return def;
     }

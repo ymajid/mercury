@@ -1,8 +1,9 @@
-import { activeConnection, lastTiming, connections, activeConnectionId, connectionStatuses } from '../store';
+import { activeConnection, lastTiming, connections, activeConnectionId, connectionStatuses, cursorInfo } from '../store';
 
 export function StatusBar() {
   const conn = activeConnection.value;
   const timing = lastTiming.value;
+  const cursor = cursorInfo.value;
   const liveStatus = activeConnectionId.value ? connectionStatuses.value[activeConnectionId.value] : null;
   const dot = liveStatus === 'connected' ? '🟢'
     : (liveStatus === 'error' || liveStatus === 'disconnected') ? '🔴'
@@ -47,6 +48,16 @@ export function StatusBar() {
       )}
 
       <div style={{ flex: 1 }} />
+
+      {/* Cursor position + characters on the current line */}
+      {cursor && (
+        <>
+          <span title="Line, column · characters on this line" style={{ color: 'rgba(255,255,255,0.7)', fontVariantNumeric: 'tabular-nums' }}>
+            Ln {cursor.line}, Col {cursor.col} · {cursor.lineChars} chars
+          </span>
+          <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
+        </>
+      )}
 
       {/* Shortcuts hint */}
       <span style={{ color: 'rgba(255,255,255,0.4)' }}>

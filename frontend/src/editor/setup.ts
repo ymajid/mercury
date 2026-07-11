@@ -116,10 +116,13 @@ export function createEditor(container: HTMLElement): EditorInstance {
     suggest: {
       showKeywords: true,
       showSnippets: false,
-      showWords: false,
+      showWords: true,   // include identifiers already typed in this file
       showFiles: false,
       preview: true,
     },
+    // Pull completion words from the current editor document (variable/function
+    // names you've defined) alongside the q language completions.
+    wordBasedSuggestions: 'currentDocument',
     inlineSuggest: { enabled: false },
     tabCompletion: 'on',
     acceptSuggestionOnEnter: 'on',

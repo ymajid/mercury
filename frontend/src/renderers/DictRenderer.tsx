@@ -29,7 +29,9 @@ function DictNode({ keys, values, depth }: { keys: any; values: any; depth: numb
   const hasExpandable = entries.some(e => isExpandable(e.value));
   const rawMaxKeyLen = Math.max(...entries.map(e => renderKey(e.key).length), 0);
   const maxKeyLen = hasExpandable ? rawMaxKeyLen + 1 : rawMaxKeyLen; // +1 for ▶/▼
-  const keyColCh = Math.max(4, Math.min(maxKeyLen, 40));
+  // Size the key column to the longest key so nothing is clipped (cap only to
+  // avoid a pathologically wide column pushing values off-screen).
+  const keyColCh = Math.max(4, Math.min(maxKeyLen, 200));
 
   // At depth>0, the parent's expanded-area div already handles the | alignment.
   // Only add a small indent so nested keys don't sit flush against the border.
@@ -65,7 +67,7 @@ function DictRow({ entry, depth, keyColCh }: {
         {/* Key column: arrow + key, left-aligned, fixed width */}
         <span style={{
           color: 'var(--syntax-ltblue)', flexShrink: 0, textAlign: 'left',
-          width: keyColCh + 'ch', overflow: 'hidden',
+          width: keyColCh + 'ch', whiteSpace: 'nowrap',
         }}>
           {valueIsNested && <span style={{ color: 'var(--border-strong)' }}>{expanded ? '▼' : '▶'}</span>}
           {!valueIsNested && <span style={{ visibility: 'hidden' }}>▶</span>}

@@ -11,6 +11,14 @@ interface Props {
 export function ListRenderer({ result }: Props) {
   const items = (result.items || []) as any[];
 
+  // Empty list — say so explicitly instead of rendering a blank panel.
+  if (items.length === 0) {
+    return <div style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+      <span style={{ fontFamily: 'monospace', color: 'var(--text)' }}>()</span>
+      <span style={{ color: 'var(--text-dim)', marginLeft: '8px' }}>empty list</span>
+    </div>;
+  }
+
   // Detect matrix: all items are lists of the same length
   const isMatrix = items.length > 0
     && items.every((it: any) => it && it.type === 'list')

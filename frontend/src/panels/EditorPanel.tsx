@@ -8,7 +8,7 @@ import {
   editorTabs, activeEditorTabPath, activeEditorTab,
   newTab, openFileTab, closeTab, updateTabContent, saveTabContent, renameTab,
   saveDialogVisible, saveDialogContent, saveDialogDefaultName,
-  confirmClosePath, workspaceNeedsRefresh, triggerWorkspaceRefresh,
+  confirmClosePath, workspaceNeedsRefresh, triggerWorkspaceRefresh, cursorInfo,
 } from '../store';
 import * as bridge from '../bridge';
 import { SaveDialog } from './SaveDialog';
@@ -55,6 +55,7 @@ export function EditorPanel() {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorInstance | null>(null);
   const currentTabPath = useRef<string | null>(null);
+  const execSeq = useRef(0);  // guards against an older query overwriting a newer one
 
   // Close-tab helper — at component level so JSX can access it
   const tryCloseTab = (filePath: string) => {
@@ -80,6 +81,18 @@ export function EditorPanel() {
       currentTabPath.value = tab.path;
       if (!tab.content.trim()) editor.monacoEditor.focus();
     }
+
+    // Track cursor position + current-line length for the status bar
+    const updateCursor = () => {
+      const ed = editor.monacoEditor;
+      const pos = ed.getPosition();
+      const model = ed.getModel();
+      if (pos && model) {
+        cursorInfo.value = { line: pos.lineNumber, col: pos.column, lineChars: model.getLineLength(pos.lineNumber) };
+      }
+    };
+    editor.monacoEditor.onDidChangeCursorPosition(updateCursor);
+    updateCursor();
 
     // Track content changes → mark tab dirty, or auto-create tab
     editor.monacoEditor.onDidChangeModelContent(() => {
@@ -115,11 +128,13 @@ export function EditorPanel() {
         return;
       }
 
+      const seq = ++execSeq.current;
       queryRunning.value = true;
       addConsoleMessage('q)' + text, 'info');
       const t0 = performance.now();
       try {
         const result = await bridge.queryAsync(connId, text);
+        if (seq !== execSeq.current) return;  // a newer query superseded this one
         if (!result) return; // cancelled
         const queryDoneMs = Math.round(performance.now() - t0);
         const serverMs = (result as any)._serverMs ?? 0;
@@ -141,6 +156,7 @@ export function EditorPanel() {
         // Trigger debounced workspace refresh
         triggerWorkspaceRefresh();
       } catch (e: any) {
+        if (seq !== execSeq.current) return;  // superseded — don't surface a stale error
         const msg = e.message || String(e);
         if (msg === 'Cancelled') {
           addConsoleMessage('Query cancelled', 'info');
@@ -149,7 +165,7 @@ export function EditorPanel() {
           addConsoleMessage("'" + msg, 'error');
         }
       } finally {
-        queryRunning.value = false;
+        if (seq === execSeq.current) queryRunning.value = false;
       }
     };
 

@@ -47,7 +47,11 @@ export function ResultPanel() {
       </div>
       <div style={{ flex: 1, overflow: 'auto' }}>
         {tab === 'result' && <ResultContent result={result} running={running} />}
-        {tab === 'chart' && <ChartPanelWrapper result={result} />}
+        {/* Chart stays mounted (hidden) so its axes/group config AND zoom survive
+            switching result tabs — no reconfigure, no re-render flash. */}
+        <div style={{ display: tab === 'chart' ? 'block' : 'none', height: '100%' }}>
+          <ChartPanelWrapper result={result} />
+        </div>
         {tab === 'console' && <ConsolePanel />}
         {tab === 'history' && <HistoryPanel />}
       </div>
@@ -141,7 +145,15 @@ function ResultContent({ result, running }: { result: QueryResult | null; runnin
     const v = result.v;
     const text = formatKdbInline(result);
     if (v === null || v === undefined) {
-      return <div style={{ padding: '12px 16px' }}><span style={{ color: 'var(--text-dim)', fontFamily: 'monospace', fontSize: '14px' }}>::</span></div>;
+      // Assignments, side-effecting statements, etc. return the generic null (::).
+      // Say plainly that it worked so it's not mistaken for "nothing happened".
+      return <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ color: 'var(--status-ok)', fontSize: '15px', lineHeight: 1 }}>✓</span>
+        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+          Executed — no value returned
+          <span style={{ color: 'var(--text-dim)', fontFamily: 'monospace', marginLeft: '8px' }}>(::)</span>
+        </span>
+      </div>;
     }
     return <div style={{ padding: '12px 16px' }}><span style={{ fontFamily: 'monospace', fontSize: '14px', color: 'var(--text)' }}>{text}</span></div>;
   }
