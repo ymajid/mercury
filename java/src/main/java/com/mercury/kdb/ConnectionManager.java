@@ -104,25 +104,19 @@ public class ConnectionManager {
     }
 
     public String testConnection(String host, int port, String username, String password) {
-        // First, do a fast TCP check with a short connect timeout.
-        // c.java's setSoTimeout is for reads, not the connect itself.
-        java.net.Socket probe = null;
-        try {
-            probe = new java.net.Socket();
-            probe.connect(new java.net.InetSocketAddress(host, port), 2000);
-        } catch (Exception e) {
-            return "{\"success\": false, \"error\": \"Cannot reach " + host + ":" + port + " — " + e.getMessage() + "\"}";
-        } finally {
-            if (probe != null) { try { probe.close(); } catch (Exception ignored) {} }
-        }
-
-        // TCP is reachable — now try the full kdb+ handshake
+        // A single, clean kdb+ connect+close. The c constructor already applies a
+        // connect timeout AND a handshake read timeout, so a dead/hung host fails
+        // fast without a separate raw TCP probe — which would double the
+        // open/close churn the remote process sees on every status check.
         Object c = null;
         try {
             c = connect(host, port, username, password, false); // TLS tested separately
             return "{\"success\": true}";
         } catch (Exception e) {
-            return "{\"success\": false, \"error\": \"" + e.getMessage() + "\"}";
+            String msg = e.getMessage();
+            if (msg == null) msg = "unreachable";
+            msg = msg.replace("\\", "\\\\").replace("\"", "\\\"");
+            return "{\"success\": false, \"error\": \"" + msg + "\"}";
         } finally {
             if (c != null) {
                 try { c.getClass().getMethod("close").invoke(c); } catch (Exception ignored) {}

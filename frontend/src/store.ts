@@ -13,9 +13,19 @@ export const connectionStatuses = signal<Record<string, 'connected' | 'disconnec
  * Probe the given connections (or all of them) in the background and update
  * `connectionStatuses` as each result lands. Non-blocking — safe to call on
  * startup and whenever the connection palette opens.
+ *
+ * Each probe opens a short-lived connection to the kdb+ process, so results are
+ * cached for STATUS_TTL_MS: opening the palette repeatedly won't re-probe a
+ * connection that was just checked (avoids hammering prod with open/close churn).
+ * Pass `force` to bypass the cache (e.g. an explicit refresh).
  */
-export function refreshConnectionStatuses(list: Connection[] = connections.value) {
+const _lastProbedAt: Record<string, number> = {};
+const STATUS_TTL_MS = 30_000;
+export function refreshConnectionStatuses(list: Connection[] = connections.value, force = false) {
+  const now = Date.now();
   for (const c of list) {
+    if (!force && (now - (_lastProbedAt[c.id] || 0)) < STATUS_TTL_MS) continue;
+    _lastProbedAt[c.id] = now;
     bridge.testConnectionAsync(c.host, c.port, c.username || undefined, c.password || undefined)
       .then(r => {
         connectionStatuses.value = { ...connectionStatuses.value, [c.id]: r.success ? 'connected' : 'error' };
