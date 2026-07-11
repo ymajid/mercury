@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Produce a self-contained app image for the CURRENT OS (macOS .app or Linux
+# dir), bundling a Java runtime so the user needs nothing installed. Requires
+# jpackage (JDK 17+) and a prior build.
+#   scripts/build.sh
+#   scripts/package-unix.sh 0.1.0
+# Output: dist/app/  (macOS: mercury.app · Linux: mercury/ with bin/mercury)
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+VERSION="${1:-0.1.0}"
+
+command -v jpackage >/dev/null || { echo "jpackage not found — install a JDK 17+ (https://adoptium.net)"; exit 1; }
+[ -f dist/mercury.jar ] || { echo "dist/mercury.jar not found — run scripts/build.sh first"; exit 1; }
+
+IN=build/jpackage-input
+rm -rf "$IN"; mkdir -p "$IN"
+cp dist/mercury.jar "$IN/mercury.jar"
+
+OUT=dist/app
+rm -rf "$OUT"; mkdir -p "$OUT"
+
+echo "==> Running jpackage (app-image, bundled runtime)"
+jpackage \
+  --type app-image \
+  --name mercury \
+  --app-version "$VERSION" \
+  --input "$IN" \
+  --main-jar mercury.jar \
+  --main-class com.mercury.DevServer \
+  --dest "$OUT" \
+  --java-options "-Xmx1g"
+
+echo ""
+echo "Built app image in $OUT:"
+ls "$OUT"

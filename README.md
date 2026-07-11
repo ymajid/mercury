@@ -17,23 +17,28 @@ no-Java Windows bundle) — no Electron, no install.
 └─────────────────────────────────────────────────────┘
 ```
 
-## Download & run (Windows)
+## Download & run
 
-Grab the latest build from **[Releases](https://github.com/ymajid/mercury/releases/latest)** — two options:
+Grab the latest build from **[Releases](https://github.com/ymajid/mercury/releases/latest)**.
+The bundled versions include Java, so there's **nothing to install**:
 
-| Download | Size | Needs Java? | How to start |
+| Platform | Download | Java? | Run |
 |---|---|---|---|
-| **`mercury-win-*.zip`** — bundled Java | ~80 MB | No — Java is included | Unzip → double-click **`mercury.exe`** |
-| **`mercury-*.zip`** — just the app | ~3 MB | Yes, [Java 17+](https://adoptium.net/temurin/releases/?version=17) | Unzip → double-click **`start-mercury.bat`** |
+| **Windows** | `mercury-win-*.zip` (~80 MB) | bundled | unzip → double-click **`mercury.exe`** |
+| **macOS** | `mercury-mac-*.zip` (~80 MB) | bundled | unzip → open **`mercury.app`** * |
+| **Linux** | `mercury-linux-*.tar.gz` (~80 MB) | bundled | `tar xzf …` → `./mercury/bin/mercury` |
+| Any | `mercury-*.zip` (~3 MB) | needs [17+](https://adoptium.net/temurin/releases/?version=17) | unzip → `start-mercury.bat` / `./start-mercury.sh` |
 
-Either way: a window opens, click **+ New Connection**, enter your kdb+ `host:port`,
-then type a q expression and press **Ctrl+Enter**.
+\* macOS build is unsigned, so the first time: **right-click `mercury.app` → Open**
+(or run `xattr -cr mercury.app`), then it opens normally.
+
+A window opens — click **+ New Connection**, enter your kdb+ `host:port`, then type a
+q expression and press **Ctrl+Enter**.
 
 - Google Chrome gives the cleanest window (app mode); any browser works — it falls
   back to your default automatically.
-- Different port: `start-mercury.bat 9000`. Skip auto-opening a browser: set
-  `MERCURY_NO_BROWSER=1`.
-- macOS / Linux: run `./start-mercury.sh` from the small (`mercury-*.zip`) download.
+- Different port: pass it as an argument (e.g. `start-mercury.bat 9000`). Skip
+  auto-opening a browser: set `MERCURY_NO_BROWSER=1`.
 
 mercury is a **client** — point it at your own running q process, e.g. `q -p 5000`.
 Connections and history are saved under `~/.mercury` (`%USERPROFILE%\.mercury` on Windows).
