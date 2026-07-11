@@ -25,6 +25,7 @@ import { ConnectionPalette } from './ConnectionPalette';
 import { ConfirmCloseDialog } from './ConfirmCloseDialog';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { PoppedCharts } from './PoppedCharts';
+import { AlignDialog } from './AlignDialog';
 import { ErrorBoundary } from './ErrorBoundary';
 
 export function App() {
@@ -183,6 +184,7 @@ export function App() {
       <ConnectionPalette />
       <ConfirmCloseDialog />
       <KeyboardShortcuts />
+      <AlignDialog />
       <PoppedCharts />
     </div>
   );

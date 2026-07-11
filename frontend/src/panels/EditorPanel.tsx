@@ -4,17 +4,36 @@ import { createEditor, getEditorTheme } from '../editor/setup';
 import { setEditorRef } from './Toolbar';
 import {
   activeConnectionId, queryResult, queryError, queryRunning, queryId,
-  addConsoleMessage, resultPanelTab, lastTiming, theme,
+  addConsoleMessage, resultPanelTab, lastTiming, theme, pushResultSnapshot,
   editorTabs, activeEditorTabPath, activeEditorTab,
   newTab, openFileTab, closeTab, updateTabContent, saveTabContent, renameTab,
   saveDialogVisible, saveDialogContent, saveDialogDefaultName,
-  confirmClosePath, workspaceNeedsRefresh, triggerWorkspaceRefresh, cursorInfo,
+  confirmClosePath, workspaceNeedsRefresh, triggerWorkspaceRefresh, cursorInfo, alignDialog,
 } from '../store';
 import * as bridge from '../bridge';
 import { SaveDialog } from './SaveDialog';
 import type { EditorInstance } from '../editor/setup';
 import { formatKdbInline } from '../renderers/kdbFormat';
 import { setWorkspaceContext } from '../editor/completions';
+
+/**
+ * Align each line on the first occurrence of `delim`, padding the part before it
+ * so the delimiter lands in the same column (align.nvim style). Lines without the
+ * delimiter are left untouched.
+ */
+function alignLines(lines: string[], delim: string, padAfter: number): string[] {
+  const parsed = lines.map(line => {
+    const i = line.indexOf(delim);
+    if (i < 0) return null;
+    return { left: line.slice(0, i).replace(/\s+$/, ''), right: line.slice(i + delim.length).replace(/^\s+/, '') };
+  });
+  const maxLeft = parsed.reduce((m, p) => (p ? Math.max(m, p.left.length) : m), 0);
+  return lines.map((line, idx) => {
+    const p = parsed[idx];
+    if (!p) return line;
+    return p.left.padEnd(maxLeft) + delim + ' '.repeat(padAfter) + p.right;
+  });
+}
 
 /**
  * Format a query result as kdb+ REPL console output.
@@ -151,7 +170,9 @@ export function EditorPanel() {
         const renderT0 = performance.now();
         requestAnimationFrame(() => {
           const renderMs = Math.round(performance.now() - renderT0);
-          lastTiming.value = { totalMs: queryDoneMs + renderMs, serverMs, networkMs, renderMs, rowCount };
+          const timing = { totalMs: queryDoneMs + renderMs, serverMs, networkMs, renderMs, rowCount };
+          lastTiming.value = timing;
+          pushResultSnapshot(result, text, timing);   // record for result-history navigation
         });
         // Trigger debounced workspace refresh
         triggerWorkspaceRefresh();
@@ -217,6 +238,18 @@ export function EditorPanel() {
       run: () => { window.dispatchEvent(new CustomEvent('mercury:palette')); },
     });
 
+    editor.monacoEditor.addAction({
+      id: 'mercury-align',
+      label: 'Align on delimiter…',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyA],
+      contextMenuGroupId: 'modification',
+      contextMenuOrder: 1.5,
+      run: (ed) => {
+        const sel = ed.getSelection();
+        if (sel) alignDialog.value = { startLine: sel.startLineNumber, endLine: sel.endLineNumber };
+      },
+    });
+
     const handleInsertText = (e: Event) => {
       const text = (e as CustomEvent).detail?.text;
       if (text && editorRef.current) {
@@ -264,13 +297,33 @@ export function EditorPanel() {
       }
     };
 
+    // Align selected lines on a delimiter (triggered by AlignDialog)
+    const handleApplyAlign = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      const ed = editorRef.current?.monacoEditor;
+      const model = ed?.getModel();
+      if (!ed || !model || !d?.delim) return;
+      const start = Math.max(1, d.startLine);
+      const end = Math.min(model.getLineCount(), d.endLine);
+      const lines: string[] = [];
+      for (let ln = start; ln <= end; ln++) lines.push(model.getLineContent(ln));
+      const aligned = alignLines(lines, d.delim, d.padAfter ?? 1);
+      ed.executeEdits('align', [{
+        range: { startLineNumber: start, startColumn: 1, endLineNumber: end, endColumn: model.getLineMaxColumn(end) },
+        text: aligned.join('\n'),
+      }]);
+      ed.focus();
+    };
+
     window.addEventListener('mercury:execute', handleExecute);
     window.addEventListener('mercury:insertText', handleInsertText);
     window.addEventListener('mercury:setQuery', handleSetQuery);
+    window.addEventListener('mercury:applyAlign', handleApplyAlign);
     return () => {
       window.removeEventListener('mercury:execute', handleExecute);
       window.removeEventListener('mercury:insertText', handleInsertText);
       window.removeEventListener('mercury:setQuery', handleSetQuery);
+      window.removeEventListener('mercury:applyAlign', handleApplyAlign);
       editor.dispose();
     };
   }, []);

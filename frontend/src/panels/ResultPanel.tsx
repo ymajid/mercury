@@ -1,5 +1,5 @@
 import { useEffect } from 'preact/hooks';
-import { resultPanelTab, queryResult, queryRunning, queryId, chartConfig, chartConfigs, chartNeedsRender } from '../store';
+import { resultPanelTab, queryResult, queryRunning, queryId, chartConfig, chartConfigs, chartNeedsRender, resultHistory, resultHistoryIndex, showResultAt } from '../store';
 import { TableRenderer } from '../renderers/TableRenderer';
 import { DictRenderer } from '../renderers/DictRenderer';
 import { ListRenderer } from '../renderers/ListRenderer';
@@ -36,7 +36,7 @@ export function ResultPanel() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg)', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', height: '28px', background: 'var(--bg-panel)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', height: '28px', background: 'var(--bg-panel)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', flexShrink: 0, alignItems: 'center' }}>
         {(['result', 'chart', 'console', 'history'] as const).map(t => (
           <button key={t} onClick={() => resultPanelTab.value = t}
             style={tabStyle(tab === t)}>
@@ -44,6 +44,8 @@ export function ResultPanel() {
             {t === 'result' && running ? ' (running...)' : ''}
           </button>
         ))}
+        <div style={{ flex: 1 }} />
+        <ResultHistoryNav />
       </div>
       <div style={{ flex: 1, overflow: 'auto' }}>
         {tab === 'result' && <ResultContent result={result} running={running} />}
@@ -57,6 +59,34 @@ export function ResultPanel() {
       </div>
     </div>
   );
+}
+
+/** Scroll back/forward through the last few unique results. */
+function ResultHistoryNav() {
+  const hist = resultHistory.value;
+  const idx = resultHistoryIndex.value;
+  if (hist.length < 2) return null;
+  const snap = hist[idx];
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '1px', padding: '0 6px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+      <button disabled={idx >= hist.length - 1} onClick={() => showResultAt(idx + 1)}
+        title="Older result" style={histBtn(idx >= hist.length - 1)}>‹</button>
+      <span title={snap ? snap.text : 'result history'}
+        style={{ fontVariantNumeric: 'tabular-nums', minWidth: '46px', textAlign: 'center', cursor: 'default' }}>
+        {idx === 0 ? 'latest' : `${idx + 1} of ${hist.length}`}
+      </span>
+      <button disabled={idx <= 0} onClick={() => showResultAt(idx - 1)}
+        title="Newer result" style={histBtn(idx <= 0)}>›</button>
+    </div>
+  );
+}
+
+function histBtn(disabled: boolean) {
+  return {
+    background: 'transparent', border: 'none', cursor: disabled ? 'default' : 'pointer',
+    color: disabled ? 'var(--text-dim)' : 'var(--text-bright)', fontSize: '15px', lineHeight: 1,
+    padding: '2px 6px', fontFamily: 'inherit', opacity: disabled ? 0.4 : 1,
+  };
 }
 
 function ChartPanelWrapper({ result }: { result: QueryResult | null }) {

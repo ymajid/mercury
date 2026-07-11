@@ -232,6 +232,44 @@ export const queryId = signal(0);  // incremented each query — forces renderer
 export interface QueryTiming { totalMs: number; serverMs: number; networkMs: number; renderMs: number; rowCount: number }
 export const lastTiming = signal<QueryTiming | null>(null);
 
+// ---- Result history (scroll back through the last few unique results) ----
+export interface ResultSnapshot { result: QueryResult; error: string | null; timing: QueryTiming | null; text: string; ts: string; sig: string }
+export const resultHistory = signal<ResultSnapshot[]>([]);
+export const resultHistoryIndex = signal(0);  // 0 = latest; higher = older
+const MAX_RESULT_HISTORY = 25;
+
+function resultSig(result: QueryResult, text: string): string {
+  const rc = result?.type === 'table' ? (result as any).rowCount
+    : result?.type === 'list' ? (result as any).length : '';
+  return (result?.type ?? '') + '|' + rc + '|' + text.trim();
+}
+
+/** Record a result for history navigation, collapsing an immediate repeat. */
+export function pushResultSnapshot(result: QueryResult, text: string, timing: QueryTiming | null, error: string | null = null) {
+  const sig = resultSig(result, text);
+  const hist = resultHistory.value;
+  if (hist.length > 0 && hist[0].sig === sig) {
+    // Same as the most recent — refresh it rather than adding a duplicate.
+    resultHistory.value = [{ ...hist[0], timing, ts: new Date().toISOString() }, ...hist.slice(1)];
+  } else {
+    const snap: ResultSnapshot = { result, error, timing, text: text.trim(), ts: new Date().toISOString(), sig };
+    resultHistory.value = [snap, ...hist].slice(0, MAX_RESULT_HISTORY);
+  }
+  resultHistoryIndex.value = 0;
+}
+
+/** Show a past result by index (0 = latest). Reuses the normal result renderers. */
+export function showResultAt(idx: number) {
+  const h = resultHistory.value;
+  if (idx < 0 || idx >= h.length) return;
+  resultHistoryIndex.value = idx;
+  const snap = h[idx];
+  queryResult.value = snap.result;
+  queryError.value = snap.error;
+  queryId.value++;              // fresh id → clean remount of the renderers
+  lastTiming.value = snap.timing;
+}
+
 // ---- Workspace refresh debouncing ----
 export const workspaceNeedsRefresh = signal(0);
 export function triggerWorkspaceRefresh() {
@@ -240,6 +278,9 @@ export function triggerWorkspaceRefresh() {
 
 // ---- Connection Palette ----
 export const paletteVisible = signal(false);
+
+// ---- Align dialog (align selected lines on a delimiter) ----
+export const alignDialog = signal<{ startLine: number; endLine: number } | null>(null);
 
 // ---- Confirm Close (unsaved changes) ----
 export const confirmClosePath = signal<string | null>(null);
