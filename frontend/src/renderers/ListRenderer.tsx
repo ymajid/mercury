@@ -53,10 +53,15 @@ export function ListRenderer({ result }: Props) {
 
   // Flat simple list — render inline like REPL: 0 1 2 3 ...
   if (isFlat && items.length <= 200) {
+    // Symbol vectors join with no spaces (`a`b`c) so they paste straight back
+    // into q; everything else stays space-separated (1 2 3).
+    const allSyms = items.length > 0 && items.every((it: any) =>
+      it && typeof it === 'object' && it.type === 'atom' && it.vt === 'symbol');
+    const text = items.map((it: any) => formatKdbInline(it)).join(allSyms ? '' : ' ');
     return (
       <div style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: '13px', overflow: 'auto' }}>
         <div style={{ color: 'var(--text)', lineHeight: '22px', wordBreak: 'break-all' }}>
-          {items.map((it: any) => formatKdbInline(it)).join(' ')}
+          {text}
         </div>
       </div>
     );
