@@ -1,5 +1,5 @@
 @echo off
-REM mercury launcher — double-click to start. Needs Java 17+ installed.
+REM mercury launcher - double-click to start. Needs Java 17+ installed.
 setlocal
 cd /d "%~dp0"
 

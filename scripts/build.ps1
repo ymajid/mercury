@@ -1,5 +1,5 @@
 # Build the self-contained mercury.jar (frontend + DevServer) on Windows.
-# Needs a JDK 17+ and Node 18+ on PATH — no Maven required. Output: dist\mercury.jar
+# Needs a JDK 17+ and Node 18+ on PATH - no Maven required. Output: dist\mercury.jar
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
@@ -29,7 +29,7 @@ $files += (Resolve-Path "java\src\main\java\com\mercury\DevServer.java").Path
 # Pass the files directly (splat), NOT via a javac @argfile: an @argfile treats
 # backslashes as escape characters, which mangles Windows absolute paths
 # (D:\a\... -> D:a...). PowerShell splatting quotes each path correctly.
-javac -d build\classes @files
+javac -encoding UTF-8 -d build\classes @files
 if ($LASTEXITCODE -ne 0) { throw "javac failed" }
 
 Write-Host "==> Embedding frontend into the jar"

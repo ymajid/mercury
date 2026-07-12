@@ -34,7 +34,7 @@ mkdir -p build/classes
        java/src/main/java/com/mercury/files -name '*.java'
   echo java/src/main/java/com/mercury/DevServer.java
 } | sed 's/^.*$/"&"/' > build/sources.txt
-javac -d build/classes "@build/sources.txt"
+javac -encoding UTF-8 -d build/classes "@build/sources.txt"
 
 echo "==> Embedding frontend into the jar"
 mkdir -p build/classes/frontend
