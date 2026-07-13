@@ -26,6 +26,7 @@ import { ConfirmCloseDialog } from './ConfirmCloseDialog';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { PoppedCharts } from './PoppedCharts';
 import { AlignDialog } from './AlignDialog';
+import { OpenDialog } from './OpenDialog';
 import { ErrorBoundary } from './ErrorBoundary';
 
 export function App() {
@@ -189,6 +190,7 @@ export function App() {
       <ConfirmCloseDialog />
       <KeyboardShortcuts />
       <AlignDialog />
+      <OpenDialog />
       <PoppedCharts />
     </div>
   );

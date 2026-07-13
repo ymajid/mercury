@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'preact/hooks';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
-import { createEditor, getEditorTheme } from '../editor/setup';
+import { createEditor, getEditorTheme, detectLanguage } from '../editor/setup';
 import { setEditorRef } from './Toolbar';
 import {
   activeConnectionId, queryResult, queryError, queryRunning, queryId,
   addConsoleMessage, resultPanelTab, lastTiming, theme, pushResultSnapshot,
   editorTabs, activeEditorTabPath, activeEditorTab,
   newTab, openFileTab, closeTab, updateTabContent, saveTabContent, renameTab,
-  saveDialogVisible, saveDialogContent, saveDialogDefaultName,
+  saveDialogVisible, saveDialogContent, saveDialogDefaultName, openDialogVisible,
   confirmClosePath, workspaceNeedsRefresh, triggerWorkspaceRefresh, cursorInfo, alignDialog,
 } from '../store';
 import * as bridge from '../bridge';
@@ -21,6 +21,14 @@ import { setWorkspaceContext } from '../editor/completions';
  * so the delimiter lands in the same column (align.nvim style). Lines without the
  * delimiter are left untouched.
  */
+/** Set the editor model's language from the active tab (extension / shebang). */
+function applyLanguage(mEditor: monaco.editor.IStandaloneCodeEditor, name: string, content: string) {
+  const model = mEditor.getModel();
+  if (!model) return;
+  const lang = detectLanguage(name, content);
+  if (model.getLanguageId() !== lang) monaco.editor.setModelLanguage(model, lang);
+}
+
 function alignLines(lines: string[], delim: string, padAfter: number): string[] {
   const parsed = lines.map(line => {
     const i = line.indexOf(delim);
@@ -97,6 +105,7 @@ export function EditorPanel() {
     const tab = activeEditorTab.value;
     if (tab) {
       editor.setValue(tab.content);
+      applyLanguage(editor.monacoEditor, tab.name, tab.content);
       currentTabPath.value = tab.path;
       if (!tab.content.trim()) editor.monacoEditor.focus();
     }
@@ -124,6 +133,10 @@ export function EditorPanel() {
         currentTabPath.value = tab.path;
         updateTabContent(tab.path, editor.getValue());
       }
+      // Re-detect language (e.g. a shebang typed into a scratch tab). Cheap —
+      // setModelLanguage only fires when the detected language actually changes.
+      const t = activeEditorTab.value;
+      applyLanguage(editor.monacoEditor, t?.name ?? '', editor.getValue());
     });
 
     // Execute query (async — UI stays responsive for cancellation)
@@ -193,7 +206,10 @@ export function EditorPanel() {
     editor.monacoEditor.addAction({
       id: 'mercury-execute',
       label: 'Execute Query',
-      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+      keybindings: [
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyE,
+      ],
       run: () => { handleExecute(); },
     });
 
@@ -209,6 +225,13 @@ export function EditorPanel() {
       label: 'New Tab',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyN],
       run: () => { handleNewTab(); },
+    });
+
+    editor.monacoEditor.addAction({
+      id: 'mercury-open-file',
+      label: 'Open File…',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyO],
+      run: () => { openDialogVisible.value = true; },
     });
 
     editor.monacoEditor.addAction({
@@ -359,6 +382,7 @@ export function EditorPanel() {
     if (tab) {
       currentTabPath.value = activePath;
       ed.setValue(tab.content);
+      applyLanguage(ed.monacoEditor, tab.name, tab.content);
       ed.monacoEditor.focus();
     }
   }, [activeEditorTabPath.value]);

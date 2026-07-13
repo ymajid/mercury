@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { activeConnection, connections, queryRunning, sidebarVisible, activeConnectionId, connectionStatuses, theme } from '../store';
+import { activeConnection, connections, queryRunning, sidebarVisible, activeConnectionId, connectionStatuses, theme, addConsoleMessage } from '../store';
 import * as bridge from '../bridge';
 
 let _editorRef: any = null;
@@ -12,6 +12,33 @@ export function Toolbar() {
 
   const handleExecute = () => {
     window.dispatchEvent(new CustomEvent('mercury:execute'));
+  };
+
+  // Quick connect: type host:port[:user:pass] and hit Enter — creates the
+  // connection and selects it, without opening the full new-connection form.
+  const quickConnect = (raw: string) => {
+    const s = raw.trim();
+    if (!s) return;
+    const parts = s.split(':');
+    const host = parts[0] || 'localhost';
+    const port = parts.length >= 2 ? parseInt(parts[1]) : NaN;
+    if (!Number.isFinite(port)) { addConsoleMessage('Quick connect: use host:port', 'error'); return; }
+    const user = parts[2] || '';
+    const pass = parts[3] || '';
+    try {
+      const result = bridge.addConnection(s, host, port, user, pass, '', false);
+      connections.value = bridge.getConnections();
+      activeConnectionId.value = result.id;
+      try {
+        const r = bridge.testConnection(host, port, user || undefined, pass || undefined);
+        connectionStatuses.value = { ...connectionStatuses.value, [result.id]: r.success ? 'connected' : 'error' };
+        addConsoleMessage(r.success ? `Connected: ${host}:${port}` : `${host}:${port} unreachable`, r.success ? 'info' : 'error');
+      } catch {
+        connectionStatuses.value = { ...connectionStatuses.value, [result.id]: 'error' };
+      }
+    } catch (e: any) {
+      addConsoleMessage('Quick connect failed: ' + e.message, 'error');
+    }
   };
 
   return (
@@ -61,6 +88,16 @@ export function Toolbar() {
           );
         })}
       </select>
+
+      <input placeholder="host:port ⏎"
+        title="Quick connect — type host:port (optionally :user:pass) and press Enter"
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          const el = e.target as HTMLInputElement;
+          quickConnect(el.value);
+          el.value = '';
+        }}
+        style={{ background: 'var(--bg-input)', color: 'var(--text-bright)', border: '1px solid #555', padding: '3px 6px', borderRadius: '3px', fontSize: '12px', outline: 'none', width: '128px' }} />
 
       <button onClick={handleExecute} disabled={queryRunning.value || !conn}
         title="Execute Query (Ctrl+Enter)"

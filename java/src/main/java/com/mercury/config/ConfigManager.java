@@ -225,9 +225,10 @@ public class ConfigManager {
             while (i < s.length() && (Character.isWhitespace(s.charAt(i)) || s.charAt(i) == ',')) i++;
             if (i >= s.length()) break;
 
-            // Read key
+            // Read key. Advance by the RAW span (skipString), not the decoded
+            // length — otherwise an escaped char in the value desyncs the index.
             String key = readJsonString(s, i);
-            i += key.length() + 2; // skip key + quotes
+            i = skipString(s, i);
             while (i < s.length() && s.charAt(i) != ':') i++;
             i++; // skip colon
             while (i < s.length() && Character.isWhitespace(s.charAt(i))) i++;
@@ -237,9 +238,8 @@ public class ConfigManager {
             Object value;
             char c = s.charAt(i);
             if (c == '"') {
-                String v = readJsonString(s, i);
-                i += v.length() + 2;
-                value = v;
+                value = readJsonString(s, i);
+                i = skipString(s, i);
             } else if (c == '{') {
                 // Nested object — find matching close
                 int depth = 1, start = i;
@@ -282,8 +282,30 @@ public class ConfigManager {
         while (i < s.length()) {
             char c = s.charAt(i);
             if (c == '"') break;
-            if (c == '\\') { i++; if (i < s.length()) sb.append(s.charAt(i)); i++; }
-            else { sb.append(c); i++; }
+            if (c == '\\' && i + 1 < s.length()) {
+                char e = s.charAt(++i);
+                switch (e) {
+                    case 'n': sb.append('\n'); break;   // was appending 'n' — newlines came back as the letter n
+                    case 't': sb.append('\t'); break;
+                    case 'r': sb.append('\r'); break;
+                    case 'b': sb.append('\b'); break;
+                    case 'f': sb.append('\f'); break;
+                    case '/': sb.append('/'); break;
+                    case '"': sb.append('"'); break;
+                    case '\\': sb.append('\\'); break;
+                    case 'u':
+                        if (i + 4 < s.length()) {
+                            try { sb.append((char) Integer.parseInt(s.substring(i + 1, i + 5), 16)); i += 4; }
+                            catch (NumberFormatException ignored) { sb.append(e); }
+                        } else sb.append(e);
+                        break;
+                    default: sb.append(e);
+                }
+                i++;
+            } else {
+                sb.append(c);
+                i++;
+            }
         }
         return sb.toString();
     }

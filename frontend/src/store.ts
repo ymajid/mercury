@@ -91,6 +91,9 @@ export function closePoppedChart(id: number) {
   poppedCharts.value = poppedCharts.value.filter(p => p.id !== id);
 }
 
+// ---- Open-file Dialog (Ctrl+O) ----
+export const openDialogVisible = signal(false);
+
 // ---- Save-As Dialog ----
 export const saveDialogVisible = signal(false);
 export const saveDialogDefaultName = signal('untitled.q');

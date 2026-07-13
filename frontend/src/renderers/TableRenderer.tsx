@@ -333,6 +333,11 @@ function CellValue({ val, sym }: { val: unknown; sym?: boolean }) {
     return <span style={{ color: 'var(--syntax-number)' }}>{text}</span>;
   }
   if (typeof val === 'string') {
+    // kdb null/infinity sentinels arrive as strings (0Wi, 0Ni, 0w, 0n, …) — show
+    // them in the number colour, not string-red.
+    if (/^-?0[WwNn][hijef]?$/.test(val)) {
+      return <span style={{ color: 'var(--syntax-number)' }}>{val}</span>;
+    }
     // Symbol columns show a leading backtick (kdb style) so a copied cell pastes back into q.
     return <span style={{ color: 'var(--syntax-string)' }}>{sym ? '`' + val : val}</span>;
   }

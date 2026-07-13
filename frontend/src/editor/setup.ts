@@ -1,6 +1,32 @@
+// edcore.main pulls in every EDITOR contribution — suggest/autocomplete, hover,
+// find, folding, bracket matching — WITHOUT the languages (basic-languages +
+// json/ts/css/html services), keeping the bundle slim. Bare editor.api is only
+// the API surface with no contributions, which silently disabled autocomplete.
+import 'monaco-editor/esm/vs/editor/edcore.main';
+// A few extra languages so scratch scripts (bash/python/sql/yaml) are syntax
+// highlighted. They never execute — mercury only runs q — but you can clearly
+// see it's a shell script etc. These are lightweight Monarch grammars only.
+import 'monaco-editor/esm/vs/basic-languages/shell/shell.contribution';
+import 'monaco-editor/esm/vs/basic-languages/python/python.contribution';
+import 'monaco-editor/esm/vs/basic-languages/sql/sql.contribution';
+import 'monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import { qLanguage, qLanguageConfig } from './qLanguage';
 import { qCompletionProvider } from './completions';
+
+/** Pick an editor language from a tab's filename, then its shebang; defaults to q. */
+export function detectLanguage(name: string, content: string): string {
+  const n = (name || '').toLowerCase();
+  if (n.endsWith('.q') || n.endsWith('.k')) return 'q';
+  if (n.endsWith('.sh') || n.endsWith('.bash') || n.endsWith('.zsh')) return 'shell';
+  if (n.endsWith('.py')) return 'python';
+  if (n.endsWith('.sql')) return 'sql';
+  if (n.endsWith('.yaml') || n.endsWith('.yml')) return 'yaml';
+  const first = (content || '').slice(0, 80);
+  if (/^#!.*\b(bash|sh|zsh)\b/.test(first)) return 'shell';
+  if (/^#!.*\bpython[0-9.]*\b/.test(first)) return 'python';
+  return 'q';
+}
 
 // ---- Worker Setup ----
 let editorWorker: Worker | null = null;

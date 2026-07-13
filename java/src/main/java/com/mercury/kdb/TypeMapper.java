@@ -118,19 +118,19 @@ public class TypeMapper {
             value = String.format("0x%02x", (Byte) obj & 0xff);
         } else if (obj instanceof Short) {
             type = "short";
-            value = ((Short) obj).intValue();
+            value = kdbNum(obj);
         } else if (obj instanceof Integer) {
             type = "int";
-            value = obj;
+            value = kdbNum(obj);
         } else if (obj instanceof Long) {
             type = "long";
-            value = obj;
+            value = kdbNum(obj);
         } else if (obj instanceof Float) {
             type = "real";
-            value = ((Float) obj).doubleValue();
+            value = kdbNum(obj);
         } else if (obj instanceof Double) {
             type = "float";
-            value = obj;
+            value = kdbNum(obj);
         } else if (obj instanceof Character) {
             type = "char";
             value = obj.toString();
@@ -524,6 +524,51 @@ public class TypeMapper {
                obj == null;
     }
 
+    /**
+     * Map kdb+ null/infinity sentinel numbers to their q notation (0Wi/0Ni/0w/0n
+     * …); pass any other number through unchanged. Also converts non-finite
+     * doubles/floats to strings so the result stays valid JSON (JSON has no
+     * Infinity/NaN — emitting them would break the whole response).
+     */
+    private static Object kdbNum(Object obj) {
+        if (obj instanceof Short) {
+            short v = (Short) obj;
+            if (v == Short.MAX_VALUE) return "0Wh";
+            if (v == Short.MIN_VALUE) return "0Nh";
+            if (v == -Short.MAX_VALUE) return "-0Wh";
+            return (int) v;
+        }
+        if (obj instanceof Integer) {
+            int v = (Integer) obj;
+            if (v == Integer.MAX_VALUE) return "0Wi";
+            if (v == Integer.MIN_VALUE) return "0Ni";
+            if (v == -Integer.MAX_VALUE) return "-0Wi";
+            return v;
+        }
+        if (obj instanceof Long) {
+            long v = (Long) obj;
+            if (v == Long.MAX_VALUE) return "0Wj";
+            if (v == Long.MIN_VALUE) return "0Nj";
+            if (v == -Long.MAX_VALUE) return "-0Wj";
+            return v;
+        }
+        if (obj instanceof Float) {
+            float v = (Float) obj;
+            if (Float.isNaN(v)) return "0Ne";
+            if (v == Float.POSITIVE_INFINITY) return "0We";
+            if (v == Float.NEGATIVE_INFINITY) return "-0We";
+            return (double) v;
+        }
+        if (obj instanceof Double) {
+            double v = (Double) obj;
+            if (Double.isNaN(v)) return "0n";
+            if (v == Double.POSITIVE_INFINITY) return "0w";
+            if (v == Double.NEGATIVE_INFINITY) return "-0w";
+            return v;
+        }
+        return obj;
+    }
+
     /** A symbol atom node: {type:'atom', v:'a', vt:'symbol'} — renders as `a. */
     private static Map<String, Object> symbolAtom(String s) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -541,11 +586,8 @@ public class TypeMapper {
         if (obj == null) return null;
         if (obj instanceof Boolean) return obj;
         if (obj instanceof Byte) return String.format("0x%02x", (Byte) obj & 0xff);
-        if (obj instanceof Short) return ((Short) obj).intValue();
-        if (obj instanceof Integer) return obj;
-        if (obj instanceof Long) return obj;
-        if (obj instanceof Float) return ((Float) obj).doubleValue();
-        if (obj instanceof Double) return obj;
+        if (obj instanceof Short || obj instanceof Integer || obj instanceof Long
+                || obj instanceof Float || obj instanceof Double) return kdbNum(obj);
         if (obj instanceof String) return obj;
         if (obj instanceof Character) return obj.toString();
         if (obj instanceof LocalDate) return ((LocalDate) obj).format(LOCAL_DATE_FMT);

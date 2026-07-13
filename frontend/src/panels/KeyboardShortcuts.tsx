@@ -7,8 +7,10 @@ interface ShortcutEntry {
 
 const shortcuts: ShortcutEntry[] = [
   { keys: 'Ctrl+Enter', action: 'Execute query' },
+  { keys: 'Ctrl+E', action: 'Execute query' },
   { keys: 'Ctrl+P', action: 'Switch connection' },
   { keys: 'Ctrl+N', action: 'New tab' },
+  { keys: 'Ctrl+O', action: 'Open file' },
   { keys: 'Ctrl+W', action: 'Close tab' },
   { keys: 'Ctrl+S', action: 'Save file' },
   { keys: 'Ctrl+Shift+A', action: 'Align selection on delimiter' },
