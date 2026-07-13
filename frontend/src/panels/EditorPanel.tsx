@@ -8,7 +8,7 @@ import {
   editorTabs, activeEditorTabPath, activeEditorTab,
   newTab, openFileTab, closeTab, updateTabContent, saveTabContent, renameTab,
   saveDialogVisible, saveDialogContent, saveDialogDefaultName, openDialogVisible,
-  confirmClosePath, workspaceNeedsRefresh, triggerWorkspaceRefresh, cursorInfo, alignDialog,
+  confirmClosePath, workspaceNeedsRefresh, triggerWorkspaceRefresh, cursorInfo, alignDialog, editorLanguage,
 } from '../store';
 import * as bridge from '../bridge';
 import { SaveDialog } from './SaveDialog';
@@ -21,14 +21,6 @@ import { setWorkspaceContext } from '../editor/completions';
  * so the delimiter lands in the same column (align.nvim style). Lines without the
  * delimiter are left untouched.
  */
-/** Set the editor model's language from the active tab (extension / shebang). */
-function applyLanguage(mEditor: monaco.editor.IStandaloneCodeEditor, name: string, content: string) {
-  const model = mEditor.getModel();
-  if (!model) return;
-  const lang = detectLanguage(name, content);
-  if (model.getLanguageId() !== lang) monaco.editor.setModelLanguage(model, lang);
-}
-
 function alignLines(lines: string[], delim: string, padAfter: number): string[] {
   const parsed = lines.map(line => {
     const i = line.indexOf(delim);
@@ -83,6 +75,17 @@ export function EditorPanel() {
   const editorRef = useRef<EditorInstance | null>(null);
   const currentTabPath = useRef<string | null>(null);
   const execSeq = useRef(0);  // guards against an older query overwriting a newer one
+  const manualLang = useRef<Record<string, string>>({});  // per-tab manual language override
+
+  // Set the editor language for a tab: a manual override wins, else detect from
+  // the filename / shebang. Keeps the status-bar language indicator in sync.
+  const applyLang = (mEditor: monaco.editor.IStandaloneCodeEditor, path: string, name: string, content: string) => {
+    const model = mEditor.getModel();
+    if (!model) return;
+    const lang = manualLang.current[path] || detectLanguage(name, content);
+    if (model.getLanguageId() !== lang) monaco.editor.setModelLanguage(model, lang);
+    editorLanguage.value = lang;
+  };
 
   // Close-tab helper — at component level so JSX can access it
   const tryCloseTab = (filePath: string) => {
@@ -105,7 +108,7 @@ export function EditorPanel() {
     const tab = activeEditorTab.value;
     if (tab) {
       editor.setValue(tab.content);
-      applyLanguage(editor.monacoEditor, tab.name, tab.content);
+      applyLang(editor.monacoEditor, tab.path, tab.name, tab.content);
       currentTabPath.value = tab.path;
       if (!tab.content.trim()) editor.monacoEditor.focus();
     }
@@ -133,10 +136,10 @@ export function EditorPanel() {
         currentTabPath.value = tab.path;
         updateTabContent(tab.path, editor.getValue());
       }
-      // Re-detect language (e.g. a shebang typed into a scratch tab). Cheap —
-      // setModelLanguage only fires when the detected language actually changes.
+      // Re-detect language (e.g. a shebang typed into a scratch tab); a manual
+      // override still wins. setModelLanguage only fires when it actually changes.
       const t = activeEditorTab.value;
-      applyLanguage(editor.monacoEditor, t?.name ?? '', editor.getValue());
+      applyLang(editor.monacoEditor, currentTabPath.value ?? '', t?.name ?? '', editor.getValue());
     });
 
     // Execute query (async — UI stays responsive for cancellation)
@@ -338,15 +341,28 @@ export function EditorPanel() {
       ed.focus();
     };
 
+    // Manual language switch from the status-bar picker — sticks for that tab.
+    const handleSetLanguage = (e: Event) => {
+      const lang = (e as CustomEvent).detail?.lang;
+      if (!lang) return;
+      const path = currentTabPath.value;
+      if (path) manualLang.current[path] = lang;
+      const model = editorRef.current?.monacoEditor.getModel();
+      if (model && model.getLanguageId() !== lang) monaco.editor.setModelLanguage(model, lang);
+      editorLanguage.value = lang;
+    };
+
     window.addEventListener('mercury:execute', handleExecute);
     window.addEventListener('mercury:insertText', handleInsertText);
     window.addEventListener('mercury:setQuery', handleSetQuery);
     window.addEventListener('mercury:applyAlign', handleApplyAlign);
+    window.addEventListener('mercury:setLanguage', handleSetLanguage);
     return () => {
       window.removeEventListener('mercury:execute', handleExecute);
       window.removeEventListener('mercury:insertText', handleInsertText);
       window.removeEventListener('mercury:setQuery', handleSetQuery);
       window.removeEventListener('mercury:applyAlign', handleApplyAlign);
+      window.removeEventListener('mercury:setLanguage', handleSetLanguage);
       editor.dispose();
     };
   }, []);
@@ -382,7 +398,7 @@ export function EditorPanel() {
     if (tab) {
       currentTabPath.value = activePath;
       ed.setValue(tab.content);
-      applyLanguage(ed.monacoEditor, tab.name, tab.content);
+      applyLang(ed.monacoEditor, tab.path, tab.name, tab.content);
       ed.monacoEditor.focus();
     }
   }, [activeEditorTabPath.value]);

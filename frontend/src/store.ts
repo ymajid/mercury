@@ -321,6 +321,23 @@ export const layoutSizes = signal<{ sidebar: number; editor: number }>({ sidebar
 // Editor cursor position + current-line length, shown in the status bar.
 export const cursorInfo = signal<{ line: number; col: number; lineChars: number } | null>(null);
 
+// Language of the active editor tab (shown + switchable in the status bar).
+export const editorLanguage = signal<string>('q');
+
+// Recent quick-connect targets (host:port[:user], no password) for the toolbar
+// datalist, so you can re-pick a previous custom connection.
+function loadQuickConnect(): string[] {
+  try { return JSON.parse(localStorage.getItem('mercury-quickconnect') || '[]'); } catch { return []; }
+}
+export const quickConnectHistory = signal<string[]>(loadQuickConnect());
+export function addQuickConnect(entry: string) {
+  const e = entry.trim();
+  if (!e) return;
+  const next = [e, ...quickConnectHistory.value.filter(x => x !== e)].slice(0, 15);
+  quickConnectHistory.value = next;
+  try { localStorage.setItem('mercury-quickconnect', JSON.stringify(next)); } catch {}
+}
+
 
 // ---- File Browser ----
 export const currentDir = signal<string>('');

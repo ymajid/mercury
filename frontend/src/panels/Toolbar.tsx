@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { activeConnection, connections, queryRunning, sidebarVisible, activeConnectionId, connectionStatuses, theme, addConsoleMessage } from '../store';
+import { activeConnection, connections, queryRunning, sidebarVisible, activeConnectionId, connectionStatuses, theme, addConsoleMessage, quickConnectHistory, addQuickConnect } from '../store';
 import * as bridge from '../bridge';
 
 let _editorRef: any = null;
@@ -26,15 +26,20 @@ export function Toolbar() {
     const user = parts[2] || '';
     const pass = parts[3] || '';
     try {
-      const result = bridge.addConnection(s, host, port, user, pass, '', false);
-      connections.value = bridge.getConnections();
-      activeConnectionId.value = result.id;
+      // Reuse an existing connection with the same host/port/user rather than
+      // piling up duplicates; otherwise create one.
+      const existing = connections.value.find(c => c.host === host && c.port === port && (c.username || '') === user);
+      const id = existing ? existing.id : bridge.addConnection(s, host, port, user, pass, '', false).id;
+      if (!existing) connections.value = bridge.getConnections();
+      activeConnectionId.value = id;
+      // Remember the target (without the password) for the dropdown.
+      addQuickConnect(parts.slice(0, Math.min(parts.length, 3)).join(':'));
       try {
         const r = bridge.testConnection(host, port, user || undefined, pass || undefined);
-        connectionStatuses.value = { ...connectionStatuses.value, [result.id]: r.success ? 'connected' : 'error' };
+        connectionStatuses.value = { ...connectionStatuses.value, [id]: r.success ? 'connected' : 'error' };
         addConsoleMessage(r.success ? `Connected: ${host}:${port}` : `${host}:${port} unreachable`, r.success ? 'info' : 'error');
       } catch {
-        connectionStatuses.value = { ...connectionStatuses.value, [result.id]: 'error' };
+        connectionStatuses.value = { ...connectionStatuses.value, [id]: 'error' };
       }
     } catch (e: any) {
       addConsoleMessage('Quick connect failed: ' + e.message, 'error');
@@ -89,7 +94,7 @@ export function Toolbar() {
         })}
       </select>
 
-      <input placeholder="host:port ⏎"
+      <input placeholder="host:port ⏎" list="mercury-quickconnect"
         title="Quick connect — type host:port (optionally :user:pass) and press Enter"
         onKeyDown={(e) => {
           if (e.key !== 'Enter') return;
@@ -98,6 +103,9 @@ export function Toolbar() {
           el.value = '';
         }}
         style={{ background: 'var(--bg-input)', color: 'var(--text-bright)', border: '1px solid #555', padding: '3px 6px', borderRadius: '3px', fontSize: '12px', outline: 'none', width: '128px' }} />
+      <datalist id="mercury-quickconnect">
+        {quickConnectHistory.value.map(e => <option key={e} value={e} />)}
+      </datalist>
 
       <button onClick={handleExecute} disabled={queryRunning.value || !conn}
         title="Execute Query (Ctrl+Enter)"
